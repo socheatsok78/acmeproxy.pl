@@ -109,7 +109,9 @@ sub handle_request {
   # It really should be handled in acme.sh dnssapi/acme_proxy.sh but it's not
   acme_cmd("rm", $data->{fqdn}, $data->{value}) if ($command eq 'add');
 
-  $c->render(text => acme_cmd($command, $data->{fqdn}, $data->{value}));
+  my $cmd_res = acme_cmd($command, $data->{fqdn}, $data->{value});
+
+  $c->render(text => $cmd_res->{'text'}, status => $cmd_res->{'status'});
 }
 
 # Mojo web routes
@@ -146,8 +148,8 @@ app->start('daemon', '-m', 'production', '-l', "https://$config->{bind}?cert=$ac
 # Crude but effective. Slimy yet satisfying.
 sub acme_cmd ($action, $fqdn, $value) {
   # Let's not pass weird characters to a shell
-  return "invalid characters in fqdn" unless ($fqdn =~ /^[\w_\.-]+$/);
-  return "invalid characters in value" unless ($value =~ /^[\w_\.-]+$/);
+  return { text => "invalid characters in fqdn", status => 400} unless ($fqdn =~ /^[\w_\.-]+$/);
+  return { text => "invalid characters in value", status => 400} unless ($value =~ /^[\w_\.-]+$/);
   $fqdn =~ s/\.+$//; # Some acme.sh plugins add an additional . to the end of the hostname
 
   my $shellcmd = '/usr/bin/env bash -c "' .
@@ -157,8 +159,9 @@ sub acme_cmd ($action, $fqdn, $value) {
   logg "executing: $shellcmd";
 
   # acme.sh/dnslib/dns_acmeproxy.sh explicitly looks for the quotes around $value to determine success
-  return "success: $fqdn \"$value\"" unless (system("$shellcmd"));
-  return "failed. check acmeproxy.pl logs";
+  # other clients expect full JSON and fqdn needs to end with "."
+  return { text => "{\"fqdn\": \"$fqdn.\", \"value\": \"$value\"}", status => 200} unless (system("$shellcmd"));
+  return { text => "failed. check acmeproxy.pl logs", status => 500};
 }
 
 # Authentication helper. Checks user:pass and fqdn against our authlist
