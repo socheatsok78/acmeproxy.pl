@@ -141,7 +141,8 @@ hook before_dispatch => sub ($c) {
 }
 
 # Anchors aweigh!
-app->start('daemon', '-m', 'production', '-l', "https://$config->{bind}?cert=$acmeproxy_crt_file&key=$acmeproxy_key_file");
+app->mode('production');
+app->start('daemon', '-l', "https://$config->{bind}?cert=$acmeproxy_crt_file&key=$acmeproxy_key_file");
 
 # Add or remove a DNS record using the configured acme.sh DNS provider
 # Hijacks acme.sh to use it's dnsapi library.
